@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>3D Environment</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="scene-container"></div>
+
+    <script src="https://threejs.org/build/three.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cannon/build/cannon.js"></script> <!-- Include cannon.js -->
+    <script src="OrbitControls.js"></script>
+    <!-- <script src="gjk.js"></script> -->
+
+    <script>
+        //ALGORITHM FOR DETECTION OF POLYGON COLLISION - *issue with computation with frames
+        // function dot(a, b) {
+        //     return a.x * b.x + a.y * b.y + a.z * b.z;
+        // }
+
+        // function sub(a, b) {
+        //     return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+        // }
+
+        // function support(shape1, shape2, direction) {
+        //     const support1 = shape1.reduce((maxPoint, currentPoint) => {
+        //         const dotProduct = dot(currentPoint, direction);
+        //         if (dotProduct > dot(maxPoint, direction)) {
+        //             return currentPoint;
+        //         }
+        //         return maxPoint;
+        //     }, shape1[0]);
+
+        //     const support2 = shape2.reduce((maxPoint, currentPoint) => {
+        //         const dotProduct = dot(currentPoint, direction);
+        //         if (dotProduct > dot(maxPoint, direction)) {
+        //             return currentPoint;
+        //         }
+        //         return maxPoint;
+        //     }, shape2[0]);
+
+        //     return sub(support1, support2);
+        // }
+        // function tripleProduct(a, b, c) {
+        //     const crossProduct = {
+        //         x: b.y * c.z - b.z * c.y,
+        //         y: b.z * c.x - b.x * c.z,
+        //         z: b.x * c.y - b.y * c.x
+        //     };
+
+        //     return {
+        //         x: a.y * crossProduct.z - a.z * crossProduct.y,
+        //         y: a.z * crossProduct.x - a.x * crossProduct.z,
+        //         z: a.x * crossProduct.y - a.y * crossProduct.x
+        //     };
+        // }
+        // function doSimplex(simplex, direction) {
+        //     const a = simplex[simplex.length - 1];
+        //     const ao = sub({ x: 0, y: 0, z: 0 }, a);
+
+        //     if (simplex.length === 4) {
+        //         const b = simplex[simplex.length - 2];
+        //         const c = simplex[simplex.length - 3];
+        //         const d = simplex[simplex.length - 4];
+        //         const ab = sub(b, a);
+        //         const ac = sub(c, a);
+        //         const ad = sub(d, a);
+        //         const abPerp = tripleProduct(ac, ab, ab);
+        //         const acPerp = tripleProduct(ad, ac, ac);
+
+        //         if (dot(abPerp, ao) > 0) {
+        //             simplex.splice(simplex.indexOf(c), 1);
+        //             direction.x = abPerp.x;
+        //             direction.y = abPerp.y;
+        //             direction.z = abPerp.z;
+        //         } else if (dot(acPerp, ao) > 0) {
+        //             simplex.splice(simplex.indexOf(b), 1);
+        //             direction.x = acPerp.x;
+        //             direction.y = acPerp.y;
+        //             direction.z = acPerp.z;
+        //         } else {
+        //             const adPerp = tripleProduct(ab, ad, ad);
+        //             simplex.splice(simplex.indexOf(c), 1);
+        //             simplex.splice(simplex.indexOf(b), 1);
+        //             direction.x = adPerp.x;
+        //             direction.y = adPerp.y;
+        //             direction.z = adPerp.z;
+        //         }
+        //     } else if (simplex.length === 3) {
+        //         const b = simplex[simplex.length - 2];
+        //         const c = simplex[simplex.length - 3];
+        //         const ab = sub(b, a);
+        //         const ac = sub(c, a);
+        //         const abPerp = tripleProduct(ac, ab, ab);
+
+        //         if (dot(abPerp, ao) > 0) {
+        //             direction.x = abPerp.x;
+        //             direction.y = abPerp.y;
+        //             direction.z = abPerp.z;
+        //         } else {
+        //             const acPerp = tripleProduct(ab, ac, ac);
+        //             simplex.splice(simplex.indexOf(b), 1);
+        //             direction.x = acPerp.x;
+        //             direction.y = acPerp.y;
+        //             direction.z = acPerp.z;
+        //         }
+        //     } else {
+        //         const b = simplex[simplex.length - 2];
+        //         const ab = sub(b, a);
+        //         const abPerp = tripleProduct(ab, ao, ab);
+        //         direction.x = abPerp.x;
+        //         direction.y = abPerp.y;
+        //         direction.z = abPerp.z;
+        //     }
+
+        //     return false; // Continue iteration
+        // }
+
+        // function gjk(shape1, shape2) {
+        //     const simplex = [support(shape1, shape2, { x: 1, y: 0, z: 0 })];
+        //     const direction = { x: -simplex[0].x, y: -simplex[0].y, z: -simplex[0].z };
+
+        //     while (true) {
+        //         const newSupport = support(shape1, shape2, direction);
+
+        //         if (dot(newSupport, direction) < 0) {
+        //             return false; // No collision
+        //         }
+
+        //         simplex.push(newSupport);
+
+        //         if (doSimplex(simplex, direction)) {
+        //             return true; // Collision detected
+        //         }
+        //     }
+        // }
+
+
+
+
+//         // Set up the scene, camera, and renderer
+//         const scene = new THREE.Scene();
+//         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+//         const renderer = new THREE.WebGLRenderer({ antialias: true });
+//         renderer.setSize(window.innerWidth, window.innerHeight);
+//         document.getElementById('scene-container').appendChild(renderer.domElement);
+
+//         // Enable shadows
+//         renderer.shadowMap.enabled = true;
+//         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+//         // Set up the plane
+//         const planeGeometry = new THREE.PlaneGeometry(10, 10);
+//         const planeMaterial = new THREE.MeshBasicMaterial({ color: 0xCCCCCC, side: THREE.DoubleSide });
+//         const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+//         planeMesh.rotation.x = Math.PI * -0.5; // Rotate the plane to be horizontal
+//         scene.add(planeMesh);
+
+//         // Set up the shapes
+//         const shape1Geometry = new THREE.BoxBufferGeometry(1, 1, 1);
+//         const shape2Geometry = new THREE.SphereBufferGeometry(0.5, 32, 32);
+//         const shape1Material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+//         const shape2Material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+//         const shape1Mesh = new THREE.Mesh(shape1Geometry, shape1Material);
+//         const shape2Mesh = new THREE.Mesh(shape2Geometry, shape2Material);
+
+//         shape1Mesh.position.set(-1, 1, 0);
+//         shape2Mesh.position.set(1, 1, 0);
+//         shape1Geometry.verticesNeedUpdate = true;
+//         shape2Geometry.verticesNeedUpdate = true;
+
+//         scene.add(shape1Mesh, shape2Mesh);
+
+//         // Set up the lights
+//         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+//         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+//         directionalLight.position.set(0, 5, 5);
+//         directionalLight.castShadow = true; // Enable shadow casting for the light
+//         scene.add(ambientLight, directionalLight);
+
+//         // Set up the camera
+//         camera.position.set(0, 3, 5);
+//         camera.lookAt(0, 0.5, 0);
+
+//         const controls = new THREE.OrbitControls(camera, renderer.domElement);
+//         controls.target.set(0, 0.5, 0);
+//         controls.update();
+
+//         function performCollisionDetection() {
+//     const shape1Vertices = [];
+//     const shape2Vertices = [];
+
+//     // Extract shape1 vertices
+//     const shape1Positions = shape1Mesh.geometry.getAttribute("position").array;
+//     for (let i = 0; i < shape1Positions.length; i += 3) {
+//         const vertex = new THREE.Vector3(shape1Positions[i], shape1Positions[i + 1], shape1Positions[i + 2]);
+//         vertex.applyMatrix4(shape1Mesh.matrixWorld);
+//         shape1Vertices.push(vertex);
+//     }
+
+//     // Extract shape2 vertices
+//     const shape2Positions = shape2Mesh.geometry.getAttribute("position").array;
+//     for (let i = 0; i < shape2Positions.length; i += 3) {
+//         const vertex = new THREE.Vector3(shape2Positions[i], shape2Positions[i + 1], shape2Positions[i + 2]);
+//         vertex.applyMatrix4(shape2Mesh.matrixWorld);
+//         shape2Vertices.push(vertex);
+//     }
+
+//     const collision = gjk(shape1Vertices, shape2Vertices);
+
+//     if (collision) {
+//         console.log("Collision detected!");
+//     }
+// }
+
+
+//         const shape1Speed = 0.2;
+//         const shape2Speed = 0.2;
+
+//         function updateShapePositions(delta) {
+//     const shape1Positions = shape1Mesh.geometry.attributes.position.array;
+//     const shape2Positions = shape2Mesh.geometry.attributes.position.array;
+
+//     for (let i = 0; i < shape1Positions.length; i += 3) {
+//         shape1Positions[i] += shape1Speed * delta;
+//     }
+
+//     for (let i = 0; i < shape2Positions.length; i += 3) {
+//         shape2Positions[i] -= shape2Speed * delta;
+//     }
+
+//     shape1Mesh.geometry.attributes.position.needsUpdate = true;
+//     shape2Mesh.geometry.attributes.position.needsUpdate = true;
+// }
+
+//         const clock = new THREE.Clock();
+//         const collisionDetectionInterval = 10; // Collision detection interval in seconds
+//         let timeSinceLastCollisionDetection = 0;
+
+
+//         // Animation loop
+//         function animate() {
+//             requestAnimationFrame(animate);
+
+//             const delta = clock.getDelta();
+//             timeSinceLastCollisionDetection += delta;
+
+//             updateShapePositions(delta);
+
+//             if (timeSinceLastCollisionDetection >= collisionDetectionInterval) {
+//                 performCollisionDetection();
+//                 timeSinceLastCollisionDetection = 0;
+//             }
+
+
+
+//             // console.log(shape2Vertices)
+//             // console.log(shape1Vertices)
+//             // const collision = gjk(shape1Vertices, shape2Vertices);
+
+//             // Log collision
+//             // if (collision) {
+//             //     console.log("Collision detected!");
+//             // }
+
+//             renderer.render(scene, camera);
+//         }
+
+//         animate();
+ // Set up the scene, camera, and renderer
+ const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.getElementById('scene-container').appendChild(renderer.domElement);
+
+// Enable shadows
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+// Set up the plane
+const planeGeometry = new THREE.PlaneGeometry(10, 10);
+const planeMaterial = new THREE.MeshBasicMaterial({ color: 0xCCCCCC, side: THREE.DoubleSide });
+const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+planeMesh.rotation.x = Math.PI * -0.5; // Rotate the plane to be horizontal
+scene.add(planeMesh);
+
+// Set up the shapes
+const shape1Geometry = new THREE.BoxBufferGeometry(1, 1, 1);
+const shape2Geometry = new THREE.SphereBufferGeometry(0.5, 32, 32);
+const shape1Material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+const shape2Material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+const shape1Mesh = new THREE.Mesh(shape1Geometry, shape1Material);
+const shape2Mesh = new THREE.Mesh(shape2Geometry, shape2Material);
+
+shape1Mesh.position.set(-1, 1, 0);
+shape2Mesh.position.set(1, 1, 0);
+scene.add(shape1Mesh, shape2Mesh);
+
+// Set up the lights
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+directionalLight.position.set(0, 5, 5);
+directionalLight.castShadow = true; 
+scene.add(ambientLight, directionalLight);
+
+// Set up the camera
+camera.position.set(0, 3, 5);
+camera.lookAt(0, 0.5, 0);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.5, 0);
+controls.update();
+
+// Set up the physics world
+const world = new CANNON.World();
+world.gravity.set(0, -9.82, 0); // Set gravity
+
+// Set up shape1 physics body
+const shape1Body = new CANNON.Body({ mass: 1 });
+const shape1Box = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+shape1Body.addShape(shape1Box);
+shape1Body.position.set(-1, 1, 0);
+world.addBody(shape1Body);
+
+// Set up shape2 physics body
+const shape2Body = new CANNON.Body({ mass: 1 });
+const shape2Sphere = new CANNON.Sphere(0.5);
+shape2Body.addShape(shape2Sphere);
+shape2Body.position.set(1, 1, 0);
+world.addBody(shape2Body);
+
+// Set up the plane physics body
+const planeBody = new CANNON.Body({ mass: 0 });
+const planeShape = new CANNON.Plane();
+planeBody.addShape(planeShape);
+planeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); // Rotate the plane to be horizontal
+world.addBody(planeBody);
+
+// Listen to collision events
+shape1Body.addEventListener("collide", (e) => {
+  console.log("Collision detected between shape1 and", e.body);
+});
+
+shape2Body.addEventListener("collide", (e) => {
+  console.log("Collision detected between shape2 and", e.body);
+});
+
+const clock = new THREE.Clock();
+const speed = 0.2; // Speed at which the shapes move towards each other
+
+function updateShapePositions() {
+  const delta = clock.getDelta();
+
+  shape1Mesh.position.x += speed * delta;
+  shape2Mesh.position.x -= speed * delta;
+}
+function animate() {
+  requestAnimationFrame(animate);
+
+  // Step the physics simulation
+  world.step(1 / 60);
+  updateShapePositions();
+  // Update the position and rotation of the visual meshes based on the physics bodies
+  shape1Body.position.copy(shape1Mesh.position);
+  shape1Body.quaternion.copy(shape1Mesh.quaternion);
+
+  shape2Body.position.copy(shape2Mesh.position);
+  shape2Body.quaternion.copy(shape2Mesh.quaternion);
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+
+
+    </script>
+</body>
+
+</html>
