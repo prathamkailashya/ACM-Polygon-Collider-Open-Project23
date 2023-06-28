@@ -278,113 +278,137 @@
 //         }
 
 //         animate();
- // Set up the scene, camera, and renderer
- const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.getElementById('scene-container').appendChild(renderer.domElement);
+   // Set up the scene, camera, and renderer
+   const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('scene-container').appendChild(renderer.domElement);
 
-// Enable shadows
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // Enable shadows
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-// Set up the plane
-const planeGeometry = new THREE.PlaneGeometry(10, 10);
-const planeMaterial = new THREE.MeshBasicMaterial({ color: 0xCCCCCC, side: THREE.DoubleSide });
-const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
-planeMesh.rotation.x = Math.PI * -0.5; // Rotate the plane to be horizontal
-scene.add(planeMesh);
+        // Set up the plane
+        const planeGeometry = new THREE.PlaneGeometry(10, 10);
+        const planeMaterial = new THREE.MeshPhongMaterial({ color: 0xCCCCCC, side: THREE.DoubleSide });
+        const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+        planeMesh.rotation.x = Math.PI * -0.5; // Rotate the plane to be horizontal
+        scene.add(planeMesh);
 
-// Set up the shapes
-const shape1Geometry = new THREE.BoxBufferGeometry(1, 1, 1);
-const shape2Geometry = new THREE.SphereBufferGeometry(0.5, 32, 32);
-const shape1Material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-const shape2Material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-const shape1Mesh = new THREE.Mesh(shape1Geometry, shape1Material);
-const shape2Mesh = new THREE.Mesh(shape2Geometry, shape2Material);
+        // Set up the shapes
+        const shape1Geometry = new THREE.BoxBufferGeometry(1, 1, 1);
+        const shape2Geometry = new THREE.SphereBufferGeometry(0.5, 32, 32);
+        const shape1Material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+        const shape2Material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+        const shape1Mesh = new THREE.Mesh(shape1Geometry, shape1Material);
+        const shape2Mesh = new THREE.Mesh(shape2Geometry, shape2Material);
 
-shape1Mesh.position.set(-1, 1, 0);
-shape2Mesh.position.set(1, 1, 0);
-scene.add(shape1Mesh, shape2Mesh);
+        shape1Mesh.position.set(-1, 1, 0);
+        shape2Mesh.position.set(1, 1, 0);
+        scene.add(shape1Mesh, shape2Mesh);
 
-// Set up the lights
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
-directionalLight.position.set(0, 5, 5);
-directionalLight.castShadow = true; 
-scene.add(ambientLight, directionalLight);
+        // Set up the lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+        directionalLight.position.set(0, 5, 5);
+        directionalLight.castShadow = true;
+        scene.add(ambientLight, directionalLight);
 
-// Set up the camera
-camera.position.set(0, 3, 5);
-camera.lookAt(0, 0.5, 0);
+        // Set up the camera
+        camera.position.set(0, 3, 5);
+        camera.lookAt(0, 0.5, 0);
 
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0.5, 0);
-controls.update();
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.5, 0);
+        controls.update();
 
-// Set up the physics world
-const world = new CANNON.World();
-world.gravity.set(0, -9.82, 0); // Set gravity
+        // Set up the physics world
+        const world = new CANNON.World();
+        world.gravity.set(0, -9.82, 0); // Set gravity
 
-// Set up shape1 physics body
-const shape1Body = new CANNON.Body({ mass: 1 });
-const shape1Box = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-shape1Body.addShape(shape1Box);
-shape1Body.position.set(-1, 1, 0);
-world.addBody(shape1Body);
+        // Set up shape1 physics body
+        const shape1Body = new CANNON.Body({ mass: 1 });
+        const shape1Box = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+        shape1Body.addShape(shape1Box);
+        shape1Body.position.set(-1, 1, 0);
+        world.addBody(shape1Body);
 
-// Set up shape2 physics body
-const shape2Body = new CANNON.Body({ mass: 1 });
-const shape2Sphere = new CANNON.Sphere(0.5);
-shape2Body.addShape(shape2Sphere);
-shape2Body.position.set(1, 1, 0);
-world.addBody(shape2Body);
+        // Set up shape2 physics body
+        const shape2Body = new CANNON.Body({ mass: 1 });
+        const shape2Sphere = new CANNON.Sphere(0.5);
+        shape2Body.addShape(shape2Sphere);
+        shape2Body.position.set(1, 1, 0);
+        world.addBody(shape2Body);
 
-// Set up the plane physics body
-const planeBody = new CANNON.Body({ mass: 0 });
-const planeShape = new CANNON.Plane();
-planeBody.addShape(planeShape);
-planeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); // Rotate the plane to be horizontal
-world.addBody(planeBody);
+        // Set up the plane physics body
+        const planeBody = new CANNON.Body({ mass: 0 });
+        const planeShape = new CANNON.Plane();
+        planeBody.addShape(planeShape);
+        planeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); // Rotate the plane to be horizontal
+        planeBody.collisionFilterGroup = 1; // Enable collisions for the plane
+planeBody.collisionFilterMask = -1; // Collide with all bodies
+        world.addBody(planeBody);
 
-// Listen to collision events
-shape1Body.addEventListener("collide", (e) => {
-  console.log("Collision detected between shape1 and", e.body);
-});
+        // Listen to collision events
+        shape1Body.addEventListener("collide", (e) => {
+            console.log("Collision detected between shape1 and", e.body);
+        });
 
-shape2Body.addEventListener("collide", (e) => {
-  console.log("Collision detected between shape2 and", e.body);
-});
+        shape2Body.addEventListener("collide", (e) => {
+            console.log("Collision detected between shape2 and", e.body);
+        });
 
-const clock = new THREE.Clock();
-const speed = 0.2; // Speed at which the shapes move towards each other
+        const clock = new THREE.Clock();
+        const speed = 1; // Speed at which the shapes move towards each other
+        const gravityThreshold = planeBody.position.y; // Threshold for applying additional gravity
 
-function updateShapePositions() {
+        function updateShapePositions() {
   const delta = clock.getDelta();
 
   shape1Mesh.position.x += speed * delta;
   shape2Mesh.position.x -= speed * delta;
-}
-function animate() {
-  requestAnimationFrame(animate);
 
-  // Step the physics simulation
-  world.step(1 / 60);
-  updateShapePositions();
-  // Update the position and rotation of the visual meshes based on the physics bodies
-  shape1Body.position.copy(shape1Mesh.position);
+  // Apply additional gravity if shapes pass the plane's coordinates
+  if (shape1Body.position.y < planeBody.position.y) {
+    shape1Body.applyForce(new CANNON.Vec3(0, -10, 0), shape1Body.position);
+  }
+  if (shape2Body.position.y < planeBody.position.y) {
+    shape2Body.applyForce(new CANNON.Vec3(0, -10, 0), shape2Body.position);
+  }
+
+  // Check if shapes have moved past the plane in the x direction
+  if (
+    shape1Mesh.position.x > planeMesh.position.x + planeGeometry.parameters.width / 2 ||
+    shape2Mesh.position.x < planeMesh.position.x - planeGeometry.parameters.width / 2
+  ) {
+    // Remove the shapes from the scene
+    scene.remove(shape1Mesh);
+    scene.remove(shape2Mesh);
+
+    // Remove the shapes' physics bodies from the world
+    world.remove(shape1Body);
+    world.remove(shape2Body);
+  }
+}
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Step the physics simulation
+            world.step(1 / 60);
+            updateShapePositions();
+
+            // Update the position and rotation of the visual meshes based on the physics bodies
+            shape1Body.position.copy(shape1Mesh.position);
   shape1Body.quaternion.copy(shape1Mesh.quaternion);
 
   shape2Body.position.copy(shape2Mesh.position);
   shape2Body.quaternion.copy(shape2Mesh.quaternion);
+            renderer.render(scene, camera);
+        }
 
-  renderer.render(scene, camera);
-}
-
-animate();
-
-
+        animate();
 
     </script>
 </body>
