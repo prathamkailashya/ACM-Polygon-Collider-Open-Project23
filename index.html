@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Polygon Collider — GJK Collision Visualisation</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-0: #0c1018;
+            --bg-1: #05070b;
+            --ink: #e9eef5;
+            --muted: #7e8aa0;
+            --hair: rgba(255, 255, 255, 0.09);
+            --panel: rgba(14, 18, 27, 0.55);
+            --clear: #2ee6a6;
+            --hit: #ff5470;
+            --box: #ff4d6d;
+            --sphere: #2ee6a6;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            background:
+                radial-gradient(120% 90% at 50% -10%, #161d2b 0%, var(--bg-0) 38%, var(--bg-1) 100%);
+            color: var(--ink);
+            font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+        }
+
+        canvas { display: block; }
+
+        /* Vignette + film grain for atmosphere */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            background: radial-gradient(110% 85% at 50% 35%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 3;
+            opacity: 0.05;
+            mix-blend-mode: overlay;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        #ui {
+            position: fixed;
+            inset: 0;
+            z-index: 4;
+            pointer-events: none;
+        }
+
+        #panel {
+            position: absolute;
+            top: 22px;
+            left: 22px;
+            width: 312px;
+            padding: 20px 22px 18px;
+            background: var(--panel);
+            backdrop-filter: blur(16px) saturate(140%);
+            -webkit-backdrop-filter: blur(16px) saturate(140%);
+            border: 1px solid var(--hair);
+            border-radius: 16px;
+            box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            opacity: 0;
+            transform: translateY(-14px);
+            animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+        }
+
+        .kicker {
+            font-size: 10px;
+            letter-spacing: 0.32em;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        #panel h1 {
+            font-family: "Syne", sans-serif;
+            font-weight: 800;
+            font-size: 30px;
+            line-height: 1.0;
+            letter-spacing: -0.01em;
+            margin: 8px 0 16px;
+            background: linear-gradient(95deg, #ffffff 10%, #aab6ca 90%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border: 1px solid var(--hair);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.25);
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.12em;
+            transition: border-color 0.25s, background 0.25s, color 0.25s;
+        }
+        .status .dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--muted);
+            box-shadow: 0 0 0 0 transparent;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .status.clear { color: var(--clear); border-color: rgba(46, 230, 166, 0.35); }
+        .status.clear .dot { background: var(--clear); box-shadow: 0 0 12px 1px rgba(46, 230, 166, 0.7); }
+        .status.hit { color: var(--hit); border-color: rgba(255, 84, 112, 0.55); background: rgba(255, 84, 112, 0.1); }
+        .status.hit .dot { background: var(--hit); animation: pulse 0.7s ease-in-out infinite; }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 14px 0 14px;
+        }
+        .metrics div {
+            border: 1px solid var(--hair);
+            border-radius: 9px;
+            padding: 9px 10px;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .metrics label {
+            display: block;
+            font-size: 8.5px;
+            letter-spacing: 0.18em;
+            color: var(--muted);
+            margin-bottom: 5px;
+        }
+        .metrics span {
+            font-size: 14px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .legend {
+            display: flex;
+            gap: 18px;
+            font-size: 11px;
+            color: var(--muted);
+        }
+        .legend span { display: flex; align-items: center; gap: 7px; }
+        .sw { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+        .sw.box { background: var(--box); }
+        .sw.sphere { background: var(--sphere); border-radius: 50%; }
+
+        #logPanel {
+            position: absolute;
+            left: 22px;
+            bottom: 22px;
+            width: 312px;
+            padding: 12px 16px 14px;
+            background: var(--panel);
+            backdrop-filter: blur(16px) saturate(140%);
+            -webkit-backdrop-filter: blur(16px) saturate(140%);
+            border: 1px solid var(--hair);
+            border-radius: 14px;
+            opacity: 0;
+            transform: translateY(14px);
+            animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.22s forwards;
+        }
+        .logHead {
+            font-size: 9px;
+            letter-spacing: 0.28em;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        #log {
+            font-size: 11.5px;
+            line-height: 1.7;
+            color: #b9c2d2;
+            white-space: pre-wrap;
+            min-height: 1.7em;
+        }
+        #log .t { color: #5d6b82; }
+        #log .ev-hit { color: var(--hit); }
+        #log .ev-clear { color: var(--clear); }
+        #log .ev-sys { color: var(--muted); }
+
+        #hint {
+            position: absolute;
+            right: 22px;
+            bottom: 22px;
+            font-size: 10.5px;
+            letter-spacing: 0.06em;
+            color: rgba(255, 255, 255, 0.4);
+            text-align: right;
+        }
+
+        @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 84, 112, 0.6); }
+            50% { box-shadow: 0 0 14px 3px rgba(255, 84, 112, 0.85); }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="scene-container"></div>
+
+    <div id="ui">
+        <header id="panel">
+            <div class="kicker">Gilbert · Johnson · Keerthi</div>
+            <h1>Polygon Collider</h1>
+            <div class="status clear" id="status">
+                <span class="dot"></span><span id="statusText">NO COLLISION</span>
+            </div>
+            <div class="metrics">
+                <div><label>ELAPSED</label><span id="mTime">0.00s</span></div>
+                <div><label>CENTER GAP</label><span id="mGap">—</span></div>
+                <div><label>GJK</label><span id="mGjk">—</span></div>
+            </div>
+            <div class="legend">
+                <span><i class="sw box"></i>Box</span>
+                <span><i class="sw sphere"></i>Sphere</span>
+            </div>
+        </header>
+
+        <section id="logPanel">
+            <div class="logHead">Event log</div>
+            <div id="log"></div>
+        </section>
+
+        <div id="hint">left-drag · orbit&#10;scroll · zoom&#10;right-drag · pan</div>
+    </div>
+
+    <!-- cannon.js (physics) is loaded as a classic script and exposes a global `CANNON`. -->
+    <script src="https://cdn.jsdelivr.net/npm/cannon@0.6.2/build/cannon.min.js"></script>
+
+    <!-- three.js is loaded as an ES module via an import map (pinned to r0.153.0). -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+        import { gjk } from './gjk.js';
+
+        // ---- Renderer ---------------------------------------------------------
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        document.getElementById('scene-container').appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0x080b11, 9, 30);
+
+        const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(4.2, 3.0, 6.4);
+
+        // Image-based lighting for believable PBR reflections (no external assets).
+        try {
+            const pmrem = new THREE.PMREMGenerator(renderer);
+            scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        } catch (e) {
+            console.warn('Environment map unavailable, falling back to lights only.', e);
+        }
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.6, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.minDistance = 3;
+        controls.maxDistance = 18;
+        controls.maxPolarAngle = Math.PI * 0.495;
+        controls.update();
+
+        // ---- Lighting ---------------------------------------------------------
+        scene.add(new THREE.HemisphereLight(0xbcd0ff, 0x141821, 0.55));
+
+        const keyLight = new THREE.DirectionalLight(0xfff1e0, 2.0);
+        keyLight.position.set(5, 8, 4);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.set(2048, 2048);
+        keyLight.shadow.camera.near = 1;
+        keyLight.shadow.camera.far = 30;
+        keyLight.shadow.camera.left = -8;
+        keyLight.shadow.camera.right = 8;
+        keyLight.shadow.camera.top = 8;
+        keyLight.shadow.camera.bottom = -8;
+        keyLight.shadow.bias = -0.0002;
+        keyLight.shadow.radius = 6;
+        scene.add(keyLight);
+
+        const rimLight = new THREE.SpotLight(0x4d7bff, 60, 30, Math.PI / 5, 0.5, 1.5);
+        rimLight.position.set(-6, 5, -5);
+        scene.add(rimLight);
+
+        // ---- Ground -----------------------------------------------------------
+        const planeGeometry = new THREE.PlaneGeometry(10, 10);
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(60, 60),
+            new THREE.MeshStandardMaterial({ color: 0x0c0f16, roughness: 0.95, metalness: 0.0 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+        const planeMesh = floor; // collision/removal bounds reference the visible floor
+
+        const grid = new THREE.GridHelper(40, 40, 0x2a3550, 0x161c2a);
+        grid.position.y = 0.001;
+        grid.material.transparent = true;
+        grid.material.opacity = 0.5;
+        scene.add(grid);
+
+        // ---- Shapes -----------------------------------------------------------
+        const BOX_COLOR = 0xff4d6d;
+        const SPHERE_COLOR = 0x2ee6a6;
+        const HIT_COLOR = 0xffd23f;
+
+        const shape1Geometry = new THREE.BoxGeometry(1, 1, 1);
+        const shape2Geometry = new THREE.SphereGeometry(0.5, 48, 48);
+        const shape1Material = new THREE.MeshStandardMaterial({
+            color: BOX_COLOR, roughness: 0.32, metalness: 0.15, emissive: 0x000000, emissiveIntensity: 1.0
+        });
+        const shape2Material = new THREE.MeshStandardMaterial({
+            color: SPHERE_COLOR, roughness: 0.18, metalness: 0.2, emissive: 0x000000, emissiveIntensity: 1.0
+        });
+        const shape1Mesh = new THREE.Mesh(shape1Geometry, shape1Material);
+        const shape2Mesh = new THREE.Mesh(shape2Geometry, shape2Material);
+        shape1Mesh.castShadow = shape2Mesh.castShadow = true;
+        shape1Mesh.position.set(-1, 1, 0);
+        shape2Mesh.position.set(1, 1, 0);
+        scene.add(shape1Mesh, shape2Mesh);
+
+        // ---- Physics ----------------------------------------------------------
+        const world = new CANNON.World();
+        world.gravity.set(0, -9.82, 0);
+
+        const shape1Body = new CANNON.Body({ mass: 1 });
+        shape1Body.addShape(new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)));
+        shape1Body.position.set(-1, 1, 0);
+        world.addBody(shape1Body);
+
+        const shape2Body = new CANNON.Body({ mass: 1 });
+        shape2Body.addShape(new CANNON.Sphere(0.5));
+        shape2Body.position.set(1, 1, 0);
+        world.addBody(shape2Body);
+
+        const planeBody = new CANNON.Body({ mass: 0 });
+        planeBody.addShape(new CANNON.Plane());
+        planeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+        planeBody.collisionFilterGroup = 1;
+        planeBody.collisionFilterMask = -1;
+        world.addBody(planeBody);
+
+        // ---- GJK collision read-out ------------------------------------------
+        // The visible detection is driven by the from-scratch GJK algorithm in
+        // gjk.js, run every frame on the world-space vertices of the two meshes.
+        const statusEl = document.getElementById('status');
+        const statusText = document.getElementById('statusText');
+        const logEl = document.getElementById('log');
+        const mTime = document.getElementById('mTime');
+        const mGap = document.getElementById('mGap');
+        const mGjk = document.getElementById('mGjk');
+
+        let shapesActive = true;
+        let bodiesInWorld = true;
+        let wasColliding = false;
+        let runStart = performance.now();
+        let resetAt = 0;
+        const logLines = [];
+
+        const elapsed = () => ((performance.now() - runStart) / 1000).toFixed(2);
+
+        function pushLog(text, cls) {
+            logLines.push(`<span class="t">${elapsed()}s</span>  <span class="${cls}">${text}</span>`);
+            if (logLines.length > 6) logLines.shift();
+            logEl.innerHTML = logLines.join('\n');
+            console.log(`[GJK ${elapsed()}s] ${text}`);
+        }
+
+        // Reusable vertex cache: local positions captured once, transformed in place.
+        const _v = new THREE.Vector3();
+        function makeCache(mesh) {
+            const pos = mesh.geometry.getAttribute('position');
+            const local = [];
+            const points = [];
+            for (let i = 0; i < pos.count; i++) {
+                local.push(new THREE.Vector3().fromBufferAttribute(pos, i));
+                points.push({ x: 0, y: 0, z: 0 });
+            }
+            return { local, points };
+        }
+        const cache1 = makeCache(shape1Mesh);
+        const cache2 = makeCache(shape2Mesh);
+
+        function worldPoints(mesh, cache) {
+            mesh.updateMatrixWorld();
+            const m = mesh.matrixWorld;
+            for (let i = 0; i < cache.local.length; i++) {
+                _v.copy(cache.local[i]).applyMatrix4(m);
+                cache.points[i].x = _v.x;
+                cache.points[i].y = _v.y;
+                cache.points[i].z = _v.z;
+            }
+            return cache.points;
+        }
+
+        function setColliding(hit) {
+            if (hit === wasColliding) return;
+            wasColliding = hit;
+            if (hit) {
+                statusEl.className = 'status hit';
+                statusText.textContent = 'CONTACT';
+                shape1Material.emissive.setHex(HIT_COLOR);
+                shape2Material.emissive.setHex(HIT_COLOR);
+                shape1Material.color.setHex(HIT_COLOR);
+                shape2Material.color.setHex(HIT_COLOR);
+                pushLog('collision detected — box ∩ sphere', 'ev-hit');
+            } else {
+                statusEl.className = 'status clear';
+                statusText.textContent = 'NO COLLISION';
+                shape1Material.emissive.setHex(0x000000);
+                shape2Material.emissive.setHex(0x000000);
+                shape1Material.color.setHex(BOX_COLOR);
+                shape2Material.color.setHex(SPHERE_COLOR);
+                pushLog('shapes separated', 'ev-clear');
+            }
+        }
+
+        function resetSimulation() {
+            shape1Mesh.position.set(-1, 1, 0);
+            shape2Mesh.position.set(1, 1, 0);
+            shape1Body.position.set(-1, 1, 0);
+            shape2Body.position.set(1, 1, 0);
+            if (!bodiesInWorld) {
+                world.addBody(shape1Body);
+                world.addBody(shape2Body);
+                scene.add(shape1Mesh, shape2Mesh);
+                bodiesInWorld = true;
+            }
+            shape1Material.emissive.setHex(0x000000);
+            shape2Material.emissive.setHex(0x000000);
+            shape1Material.color.setHex(BOX_COLOR);
+            shape2Material.color.setHex(SPHERE_COLOR);
+            wasColliding = false;
+            shapesActive = true;
+            runStart = performance.now();
+            statusEl.className = 'status clear';
+            statusText.textContent = 'NO COLLISION';
+            pushLog('simulation reset', 'ev-sys');
+        }
+
+        const speed = 1;
+        const clock = new THREE.Clock();
+
+        function updateShapePositions() {
+            // Clamp the step so a long frame (e.g. a backgrounded tab) can't move
+            // the shapes far enough to tunnel straight through the contact window.
+            const delta = Math.min(clock.getDelta(), 0.05);
+
+            if (shapesActive) {
+                shape1Mesh.position.x += speed * delta;
+                shape2Mesh.position.x -= speed * delta;
+            }
+
+            if (shape1Body.position.y < planeBody.position.y) {
+                shape1Body.applyForce(new CANNON.Vec3(0, -10, 0), shape1Body.position);
+            }
+            if (shape2Body.position.y < planeBody.position.y) {
+                shape2Body.applyForce(new CANNON.Vec3(0, -10, 0), shape2Body.position);
+            }
+
+            if (
+                shapesActive && (
+                    shape1Mesh.position.x > planeMesh.position.x + planeGeometry.parameters.width / 2 ||
+                    shape2Mesh.position.x < planeMesh.position.x - planeGeometry.parameters.width / 2
+                )
+            ) {
+                scene.remove(shape1Mesh);
+                scene.remove(shape2Mesh);
+                world.remove(shape1Body);
+                world.remove(shape2Body);
+                bodiesInWorld = false;
+                shapesActive = false;
+                setColliding(false);
+                statusEl.className = 'status clear';
+                statusText.textContent = 'OUT OF BOUNDS';
+                pushLog('shapes left the plane — replaying', 'ev-sys');
+                resetAt = performance.now() + 1400;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            world.step(1 / 60);
+            updateShapePositions();
+
+            shape1Body.position.copy(shape1Mesh.position);
+            shape1Body.quaternion.copy(shape1Mesh.quaternion);
+            shape2Body.position.copy(shape2Mesh.position);
+            shape2Body.quaternion.copy(shape2Mesh.quaternion);
+
+            if (shapesActive) {
+                const hit = gjk(worldPoints(shape1Mesh, cache1), worldPoints(shape2Mesh, cache2));
+                setColliding(hit);
+                mTime.textContent = `${elapsed()}s`;
+                mGap.textContent = `${shape1Mesh.position.distanceTo(shape2Mesh.position).toFixed(2)}`;
+                mGjk.textContent = hit ? 'CONTACT' : 'CLEAR';
+            } else if (resetAt && performance.now() >= resetAt) {
+                resetAt = 0;
+                resetSimulation();
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        pushLog('GJK detector online — 2 convex bodies', 'ev-sys');
+        animate();
+    </script>
+</body>
+
+</html>

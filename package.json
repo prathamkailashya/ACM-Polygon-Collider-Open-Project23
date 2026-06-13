@@ -1,0 +1,18 @@
+{
+  "name": "polygon-collider",
+  "version": "1.0.0",
+  "description": "3D polygon visualisation and collision detection in the browser using three.js, cannon.js, and a from-scratch GJK implementation.",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes serve .",
+    "dev": "npx --yes serve ."
+  },
+  "keywords": [
+    "threejs",
+    "cannonjs",
+    "gjk",
+    "collision-detection",
+    "webgl"
+  ],
+  "license": "ISC"
+}
